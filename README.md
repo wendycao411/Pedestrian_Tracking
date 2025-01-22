@@ -12,3 +12,5 @@ Pedestrian Tracking with DeepSORT (ID + Trails) </H1>
 
 ## References
 - https://github.com/ultralytics/ultralytics
+- https://github.com/MuhammadMoinFaisal/YOLOv8_Segmentation_DeepSORT_Object_Tracking
+- https://github.com/Emmmmmmaa/MetabolicWalking
