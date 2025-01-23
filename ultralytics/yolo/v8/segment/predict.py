@@ -10,6 +10,9 @@ from ultralytics.yolo.utils.plotting import colors, save_one_box
 from ultralytics.yolo.v8.detect.predict import DetectionPredictor
 from numpy import random
 
+import csv
+
+from inference_sdk import InferenceHTTPClient
 
 import cv2
 from deep_sort_pytorch.utils.parser import get_config
@@ -22,6 +25,7 @@ palette = (2 ** 11 - 1, 2 ** 15 - 1, 2 ** 20 - 1)
 data_deque = {}
 
 deepsort = None
+CLIENT = InferenceHTTPClient(api_url="https://detect.roboflow.com", api_key="ulqxanubirqKwK6WxvQp")
 
 def init_tracker():
     global deepsort
@@ -92,14 +96,14 @@ def UI_box(x, img, color=None, label=None, line_thickness=None):
 
 
 
-def draw_boxes(img, bbox, names,object_id, identities=None, offset=(0, 0)):
-    #cv2.line(img, line[0], line[1], (46,162,112), 3)
-
+def draw_boxes(img, bbox, names, object_id, identities, boundaries, frame, offset=(0, 0), frame_number=0):
     height, width, _ = img.shape
-    # remove tracked point from buffer if object is lost
+    in_shadow_count = 0
+    out_shadow_count = 0
+
     for key in list(data_deque):
-      if key not in identities:
-        data_deque.pop(key)
+        if key not in identities:
+            data_deque.pop(key)
 
     for i, box in enumerate(bbox):
         x1, y1, x2, y2 = [int(i) for i in box]
@@ -108,31 +112,52 @@ def draw_boxes(img, bbox, names,object_id, identities=None, offset=(0, 0)):
         y1 += offset[1]
         y2 += offset[1]
 
-        # code to find center of bottom edge
-        center = (int((x2+x1)/ 2), int((y2+y2)/2))
-
-        # get ID of object
+        bottom_center = (int((x2 + x1) / 2), y2)
         id = int(identities[i]) if identities is not None else 0
 
-        # create new buffer for new object
-        if id not in data_deque:  
-          data_deque[id] = deque(maxlen= 64)
+        if id not in data_deque:
+            data_deque[id] = deque(maxlen=64)
         color = compute_color_for_labels(object_id[i])
         obj_name = names[object_id[i]]
-        label = '{}{:d}'.format("", id) + ":"+ '%s' % (obj_name)
+        label = '{}{:d}'.format("", id) + ":" + '%s' % (obj_name)
 
-        # add center to buffer
-        data_deque[id].appendleft(center)
+        data_deque[id].appendleft(bottom_center)
         UI_box(box, img, label=label, color=color, line_thickness=2)
-        # draw trail
-        for i in range(1, len(data_deque[id])):
-            # check if on buffer value is none
-            if data_deque[id][i - 1] is None or data_deque[id][i] is None:
+
+        for j in range(1, len(data_deque[id])):
+            if data_deque[id][j - 1] is None or data_deque[id][j] is None:
                 continue
-            # generate dynamic thickness of trails
-            thickness = int(np.sqrt(64 / float(i + i)) * 1.5)
-            # draw trails
-            cv2.line(img, data_deque[id][i - 1], data_deque[id][i], color, thickness)
+            thickness = int(np.sqrt(64 / float(j + j)) * 1.5)
+            cv2.line(img, data_deque[id][j - 1], data_deque[id][j], color, thickness)
+
+        in_shadow = False
+        for boundary in boundaries:
+            boundary_points = np.array(boundary, np.int32).reshape((-1, 1, 2))
+            cv2.polylines(img, [boundary_points], isClosed=True, color=(255, 0, 0), thickness=2)
+            if cv2.pointPolygonTest(boundary_points, bottom_center, False) >= 0:
+                in_shadow = True
+                break
+
+        shadow_label = 'in-shadow' if in_shadow else 'out-shadow'
+        if in_shadow:
+            in_shadow_count += 1
+        else:
+            out_shadow_count += 1
+        label = f'{id}: {shadow_label}'
+
+        UI_box(box, img, label=label, color=color, line_thickness=2)
+
+        for j in range(1, len(data_deque[id])):
+            if data_deque[id][j - 1] is None or data_deque[id][j] is None:
+                continue
+            thickness = int(np.sqrt(64 / float(j + j)) * 1.5)
+            cv2.line(img, data_deque[id][j - 1], data_deque[id][j], color, thickness)
+
+    # Display frame number, total count of people, and counts of people in-shadow and out-shadow
+    total_people = in_shadow_count + out_shadow_count
+    frame_info = f"Frame: {frame_number} | Total: {total_people} | In-Shadow: {in_shadow_count} | Out-Shadow: {out_shadow_count}"
+    cv2.putText(img, frame_info, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+
     return img
 
 
@@ -162,69 +187,89 @@ class SegmentationPredictor(DetectionPredictor):
         return (p, masks)
 
     def write_results(self, idx, preds, batch):
-        p, im, im0 = batch
-        log_string = ""
-        if len(im.shape) == 3:
-            im = im[None]  # expand for batch dim
-        self.seen += 1
-        if self.webcam:  # batch_size >= 1
-            log_string += f'{idx}: '
-            frame = self.dataset.count
-        else:
-            frame = getattr(self.dataset, 'frame', 0)
+      p, im, im0 = batch
+      log_string = ""
+      if len(im.shape) == 3:
+          im = im[None]  # expand for batch dim
+      self.seen += 1
+      if self.webcam:  # batch_size >= 1
+          log_string += f'{idx}: '
+          frame_number = self.dataset.count
+      else:
+          frame_number = getattr(self.dataset, 'frame', 0)
 
-        self.data_path = p
-        self.txt_path = str(self.save_dir / 'labels' / p.stem) + ('' if self.dataset.mode == 'image' else f'_{frame}')
-        log_string += '%gx%g ' % im.shape[2:]  # print string
-        self.annotator = self.get_annotator(im0)
+      self.data_path = p
+      self.txt_path = str(self.save_dir / 'labels' / p.stem) + ('' if self.dataset.mode == 'image' else f'_{frame_number}')
+      log_string += '%gx%g ' % im.shape[2:]  # print string
+      self.annotator = self.get_annotator(im0)
 
-        preds, masks = preds
-        det = preds[idx]
-        if len(det) == 0:
-            return log_string
-        # Segments
-        mask = masks[idx]
-        if self.args.save_txt:
-            segments = [
-                ops.scale_segments(im0.shape if self.args.retina_masks else im.shape[2:], x, im0.shape, normalize=True)
-                for x in reversed(ops.masks2segments(mask))]
+      preds, masks = preds
+      det = preds[idx]
+      if len(det) == 0:
+          return log_string
+      mask = masks[idx]
+      if self.args.save_txt:
+          segments = [
+              ops.scale_segments(im0.shape if self.args.retina_masks else im.shape[2:], x, im0.shape, normalize=True)
+              for x in reversed(ops.masks2segments(mask))]
 
-        # Print results
-        for c in det[:, 5].unique():
-            n = (det[:, 5] == c).sum()  # detections per class
-            log_string += f"{n} {self.model.names[int(c)]}{'s' * (n > 1)}, "  # add to string
+      for c in det[:, 5].unique():
+          n = (det[:, 5] == c).sum()  # detections per class
+          log_string += f"{n} {self.model.names[int(c)]}{'s' * (n > 1)}, "  # add to string
 
-        # Mask plotting
-        self.annotator.masks(
-            mask,
-            colors=[colors(x, True) for x in det[:, 5]],
-            im_gpu=torch.as_tensor(im0, dtype=torch.float16).to(self.device).permute(2, 0, 1).flip(0).contiguous() /
-            255 if self.args.retina_masks else im[idx])
+      self.annotator.masks(
+          mask,
+          colors=[colors(x, True) for x in det[:, 5]],
+          im_gpu=torch.as_tensor(im0, dtype=torch.float16).to(self.device).permute(2, 0, 1).flip(0).contiguous() / 255 if self.args.retina_masks else im[idx])
 
-        det = reversed(det[:, :6])
-        self.all_outputs.append([det, mask])
-        xywh_bboxs = []
-        confs = []
-        oids = []
-        outputs = []
-        # Write results
-        for j, (*xyxy, conf, cls) in enumerate(reversed(det[:, :6])):
-            x_c, y_c, bbox_w, bbox_h = xyxy_to_xywh(*xyxy)
-            xywh_obj = [x_c, y_c, bbox_w, bbox_h]
-            xywh_bboxs.append(xywh_obj)
-            confs.append([conf.item()])
-            oids.append(int(cls))
-        xywhs = torch.Tensor(xywh_bboxs)
-        confss = torch.Tensor(confs)
-          
-        outputs = deepsort.update(xywhs, confss, oids, im0)
-        if len(outputs) > 0:
-            bbox_xyxy = outputs[:, :4]
-            identities = outputs[:, -2]
-            object_id = outputs[:, -1]
-            
-            draw_boxes(im0, bbox_xyxy, self.model.names, object_id,identities)
-        return log_string
+      det = reversed(det[:, :6])
+      self.all_outputs.append([det, mask])
+      xywh_bboxs = []
+      confs = []
+      oids = []
+      outputs = []
+      for j, (*xyxy, conf, cls) in enumerate(reversed(det[:, :6])):
+          if int(cls) != 0:  # Only process humans
+              continue
+          x_c, y_c, bbox_w, bbox_h = xyxy_to_xywh(*xyxy)
+          xywh_obj = [x_c, y_c, bbox_w, bbox_h]
+          xywh_bboxs.append(xywh_obj)
+          confs.append([conf.item()])
+          oids.append(int(cls))
+      xywhs = torch.Tensor(xywh_bboxs)
+      confss = torch.Tensor(confs)
+
+      outputs = deepsort.update(xywhs, confss, oids, im0)
+      if len(outputs) > 0:
+          bbox_xyxy = outputs[:, :4]
+          identities = outputs[:, -2]
+          object_id = outputs[:, -1]
+
+          shadow_result = CLIENT.infer(im0, model_id="shade-detection/1")
+          boundaries = []
+
+          if 'predictions' in shadow_result:
+              predictions = shadow_result['predictions']
+              for prediction in predictions:
+                  points = prediction.get("points", [])
+                  if points:
+                      boundary = [(int(point['x']), int(point['y'])) for point in points]
+                      boundaries.append(boundary)
+
+          draw_boxes(im0, bbox_xyxy, self.model.names, object_id, identities, boundaries, frame_number)
+          for i, box in enumerate(bbox_xyxy):
+              id = int(identities[i])
+              bottom_center_x, bottom_center_y = int((box[0] + box[2]) / 2), int(box[3])  # Bottom center
+              in_shadow = False
+
+              for boundary in boundaries:
+                  if cv2.pointPolygonTest(np.array(boundary, np.int32), (int(bottom_center_x), int(bottom_center_y)), False) >= 0:
+                      in_shadow = True
+                      break
+
+              self.csv_writer.writerow([frame_number, id, bottom_center_x, bottom_center_y, in_shadow])
+
+      return log_string
 
 
 @hydra.main(version_base=None, config_path=str(DEFAULT_CONFIG.parent), config_name=DEFAULT_CONFIG.name)
@@ -233,9 +278,17 @@ def predict(cfg):
     cfg.model = cfg.model or "yolov8n-seg.pt"
     cfg.imgsz = check_imgsz(cfg.imgsz, min_dim=2)  # check image size
     cfg.source = cfg.source if cfg.source is not None else ROOT / "assets"
+    
+    # Open CSV file for writing tracking data
+    csv_file = open('tracking_data.csv', mode='w', newline='')
+    csv_writer = csv.writer(csv_file)
+    csv_writer.writerow(['frame_number', 'id', 'centroid_x', 'centroid_y', 'in_shadow'])  # Write header row
 
     predictor = SegmentationPredictor(cfg)
+    predictor.csv_writer = csv_writer  # Pass CSV writer to predictor
     predictor()
+
+    csv_file.close()  # Close CSV file at the end
 
 
 if __name__ == "__main__":
