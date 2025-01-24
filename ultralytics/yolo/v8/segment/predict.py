@@ -9,6 +9,7 @@ from ultralytics.yolo.utils.plotting import colors, save_one_box
 
 from ultralytics.yolo.v8.detect.predict import DetectionPredictor
 from numpy import random
+from pathlib import Path
 
 import csv
 
@@ -25,7 +26,7 @@ palette = (2 ** 11 - 1, 2 ** 15 - 1, 2 ** 20 - 1)
 data_deque = {}
 
 deepsort = None
-CLIENT = InferenceHTTPClient(api_url="https://detect.roboflow.com", api_key="ulqxanubirqKwK6WxvQp")
+CLIENT = InferenceHTTPClient(api_url="https://detect.roboflow.com", api_key="MlD67rmWJeli5xzVofAy")
 
 def init_tracker():
     global deepsort
@@ -271,25 +272,33 @@ class SegmentationPredictor(DetectionPredictor):
 
       return log_string
 
-
 @hydra.main(version_base=None, config_path=str(DEFAULT_CONFIG.parent), config_name=DEFAULT_CONFIG.name)
 def predict(cfg):
     init_tracker()
     cfg.model = cfg.model or "yolov8n-seg.pt"
     cfg.imgsz = check_imgsz(cfg.imgsz, min_dim=2)  # check image size
     cfg.source = cfg.source if cfg.source is not None else ROOT / "assets"
-    
+
+    # Use the directory of the source video to generate the output path
+    source_path = Path(cfg.source)
+    output_video_path = str(source_path.parent / f"{source_path.stem}_output.mp4")
+    csv_file_path = output_video_path.replace('.mp4', '_tracking_data.csv')
+
     # Open CSV file for writing tracking data
-    csv_file = open('tracking_data.csv', mode='w', newline='')
+    csv_file = open(csv_file_path, mode='w', newline='')
     csv_writer = csv.writer(csv_file)
-    csv_writer.writerow(['frame_number', 'id', 'centroid_x', 'centroid_y', 'in_shadow'])  # Write header row
+    csv_writer.writerow(['frame', 'id', 'bot_center_x', 'bot_center_y', 'in_shadow'])  # Write header row
 
     predictor = SegmentationPredictor(cfg)
     predictor.csv_writer = csv_writer  # Pass CSV writer to predictor
-    predictor()
-
+    
+    with torch.no_grad():  # Disable gradient calculations
+        predictor()
+    
     csv_file.close()  # Close CSV file at the end
 
-
+    # Clear unused GPU memory
+    torch.cuda.empty_cache()
+    
 if __name__ == "__main__":
     predict()
