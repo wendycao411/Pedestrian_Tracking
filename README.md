@@ -10,8 +10,8 @@ Pedestrian Tracking with DeepSORT (ID + Trails) </H1>
 2. ~~Count people in shade~~
 3. ~~Save outputs in csv file (count, velocity, centroid, etc.)~~
 4. Analyze data using matplotlib (heat map, plot paths across frames, scatter plot?, analyze shade preference, a cooler but difficult one would be homography transformations) 
-5. Be able to analyze full videos
-6. Improve video quality without crashing
+~~5. Be able to analyze full videos~~
+~~6. Improve video quality without crashing~~
 
 ## References
 - https://github.com/ultralytics/ultralytics
