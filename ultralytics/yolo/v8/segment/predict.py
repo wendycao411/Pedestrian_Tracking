@@ -12,6 +12,9 @@ from numpy import random
 from pathlib import Path
 
 import csv
+import os
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+
 
 from inference_sdk import InferenceHTTPClient
 
@@ -26,7 +29,7 @@ palette = (2 ** 11 - 1, 2 ** 15 - 1, 2 ** 20 - 1)
 data_deque = {}
 
 deepsort = None
-CLIENT = InferenceHTTPClient(api_url="https://detect.roboflow.com", api_key="MlD67rmWJeli5xzVofAy")
+CLIENT = InferenceHTTPClient(api_url="https://detect.roboflow.com", api_key="10y4aLdke807CNnG81Dm")
 
 def init_tracker():
     global deepsort
