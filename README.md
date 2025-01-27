@@ -13,7 +13,7 @@ Pedestrian Tracking with DeepSORT (ID + Trails) </H1>
 
    a. ~~Basic graphs - heat map, plot paths across frames, scatter plot?, analyze shade preference~~
 
-   b. Get coordinates + area of shade polygon and track how it changes
+   b. ~~Get coordinates + area of shade polygon and track how it changes~~
 
    c. ~~Separate people into categories: start + end in shade, start + end out of shade, start + end different -- track ratio of categories across different days~~
 
