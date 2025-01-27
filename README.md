@@ -17,13 +17,12 @@ Pedestrian Tracking with DeepSORT (ID + Trails) </H1>
 
    c. Separate people into categories: start + end in shade, start + end out of shade, start + end different -- track ratio of categories across different days
 
-   d. Area of street??
+   d. Area of street?? Apply homography transformation
 
    e. Track weather information across several days
    
-6. Apply homography transformation
-7. ~~Be able to analyze full videos~~
-8. ~~Improve video quality without crashing~~
+5. ~~Be able to analyze full videos~~
+6. ~~Improve video quality without crashing~~
 
 ## References
 - https://github.com/ultralytics/ultralytics
