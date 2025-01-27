@@ -10,10 +10,15 @@ Pedestrian Tracking with DeepSORT (ID + Trails) </H1>
 2. ~~Count people in shade~~
 3. ~~Save outputs in csv file (count, velocity, centroid, etc.)~~
 4. Analyze data using matplotlib (heat map, plot paths across frames, scatter plot?, analyze shade preference)
+
    a. Get coordinates + area of shade polygon and track how it changes
+
    b. Separate people into categories: start + end in shade, start + end out of shade, start + end different -- track ratio of categories across different days
+
    c. Area of street??
+
    d. Track weather information across several days
+   
 6. Apply homography transformation
 7. ~~Be able to analyze full videos~~
 8. ~~Improve video quality without crashing~~
