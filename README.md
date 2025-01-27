@@ -15,7 +15,7 @@ Pedestrian Tracking with DeepSORT (ID + Trails) </H1>
 
    b. Get coordinates + area of shade polygon and track how it changes
 
-   c. Separate people into categories: start + end in shade, start + end out of shade, start + end different -- track ratio of categories across different days
+   c. ~~Separate people into categories: start + end in shade, start + end out of shade, start + end different -- track ratio of categories across different days~~
 
    d. Area of street?? Apply homography transformation
 
