@@ -9,15 +9,17 @@ Pedestrian Tracking with DeepSORT (ID + Trails) </H1>
 1. ~~Detect shade using this algorithm: https://github.com/wendycao411/MetabolicWalking_Original.git~~
 2. ~~Count people in shade~~
 3. ~~Save outputs in csv file (count, velocity, centroid, etc.)~~
-4. Analyze data using matplotlib (heat map, plot paths across frames, scatter plot?, analyze shade preference)
+4. Analyze data using matplotlib
 
-   a. Get coordinates + area of shade polygon and track how it changes
+   a. ~~Basic graphs - heat map, plot paths across frames, scatter plot?, analyze shade preference~~
 
-   b. Separate people into categories: start + end in shade, start + end out of shade, start + end different -- track ratio of categories across different days
+   b. Get coordinates + area of shade polygon and track how it changes
 
-   c. Area of street??
+   c. Separate people into categories: start + end in shade, start + end out of shade, start + end different -- track ratio of categories across different days
 
-   d. Track weather information across several days
+   d. Area of street??
+
+   e. Track weather information across several days
    
 6. Apply homography transformation
 7. ~~Be able to analyze full videos~~
