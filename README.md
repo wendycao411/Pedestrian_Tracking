@@ -22,6 +22,8 @@ Pedestrian Tracking with DeepSORT (ID + Trails) </H1>
    e. Track weather information across several days
    
    f. Overlay graphs to compare stats across different days
+
+   g. Geocoordinates???
    
 6. ~~Be able to analyze full videos~~
 7. ~~Improve video quality without crashing~~
